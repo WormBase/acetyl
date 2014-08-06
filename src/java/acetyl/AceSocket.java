@@ -48,9 +48,10 @@ public class AceSocket {
     private boolean pendingConfig = true;
     private int serverVersion = 0;
     private int clientId = 0;
-    private int encore = 0;
+    boolean encore = false;
     private int maxBytes = 0;
     private boolean defunct = false;
+    int transactionCount = 0;
 
     public AceSocket(String host, int port)
 	throws Exception
@@ -78,6 +79,7 @@ public class AceSocket {
     }
 
     public String transact(String s) throws Exception {
+	++transactionCount;
 	try {
 	    if (dis.available() != 0) {
 		handleUnsolicited();
@@ -89,6 +91,16 @@ public class AceSocket {
 	} catch (IOException ex) {
 	    throw new Exception(ex);
 	}
+    }
+
+    public InputStream transactToStream(String s) throws Exception {
+	++transactionCount;
+	if (dis.available() != 0) {
+	    handleUnsolicited();
+	}
+
+	writeMessage(MSGREQ, s);
+	return new AceInputStream(this);
     }
 
     private void handleUnsolicited() throws Exception {
@@ -116,14 +128,29 @@ public class AceSocket {
     private String readMessage() throws IOException {
 	StringBuilder sb = new StringBuilder();
 	while (readMessagePart(sb)) {
-	    writeMessage(MSGENCORE, "encore");
+	    writeEncore();
 	}
 	return sb.toString();
     }
-	
+
+    void writeEncore()
+	throws IOException
+    {
+	if (!encore)
+	    throw new IllegalStateException();
+	writeMessage(MSGENCORE, "encore");
+    }
+    
     private boolean readMessagePart(StringBuilder sb)
 	throws IOException
     { 	
+	sb.append(new String(read()));
+	return this.encore;
+    }
+
+    byte[] read()
+	throws IOException
+    {
 	int magic = dis.readInt();
 	int length = dis.readInt();
 
@@ -144,11 +171,12 @@ public class AceSocket {
 	byte[] message = new byte[length-1];
 	dis.readFully(message);
 	dis.skipBytes(1);
-        sb.append(new String(message));
+        
 
-	return type.startsWith(MSGENCORE);
+	this.encore = type.startsWith(MSGENCORE);
+	return message;
     }
-
+    
     public void dispose() throws Exception {
 	try {
 	    defunct = true;
@@ -185,5 +213,73 @@ public class AceSocket {
 
     public boolean isDefunct() {
 	return defunct;
+    }
+}
+
+class AceInputStream  extends InputStream {
+    private AceSocket socket;
+    private int validity;
+    
+    private byte[] buffer;
+    private int offset;
+
+    AceInputStream(AceSocket s)
+	throws IOException
+    {
+	this.socket = s;
+	this.validity = this.socket.transactionCount;
+	next();
+    }
+
+    private void validate()
+	throws IOException
+    {
+	if (this.validity != this.socket.transactionCount)
+	    throw new IOException("Tried to read from AceInputStream after a new transaction has been performed");
+    }
+
+    private boolean next()
+	throws IOException
+    {
+	if (buffer == null || socket.encore) {
+	    if (socket.encore)
+		socket.writeEncore();
+	    buffer = socket.read();
+	    offset = 0;
+	    return true;
+	} else {
+	    return false;
+	}
+    }
+    
+    public int read()
+	throws IOException
+    {
+	validate();
+	if (offset >= buffer.length)
+	    if (!next())
+		return -1;
+	
+	return buffer[offset++];
+    }
+
+    public int read(byte[] b)
+	throws IOException
+    {
+	return read(b, 0, b.length);
+    }
+
+    public int read(byte[] b, int off, int len)
+	throws IOException
+    {
+	validate();
+	if (offset >= buffer.length)
+	    if (!next())
+		return -1;
+
+	int r = Math.min(len, buffer.length-offset);
+	System.arraycopy(buffer, offset, b, off, r);
+	offset += r;
+	return r;
     }
 }

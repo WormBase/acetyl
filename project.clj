@@ -5,6 +5,3 @@
   :java-source-paths ["src/java"]
   :license "LGPL"
   :url "http://www.biodalliance.org/people/thomas")
-
-
-;  :repositories [["releases" {:url "file:///Users/tdown/repo"}]])
