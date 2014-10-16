@@ -1,4 +1,4 @@
-(defproject acetyl "0.0.2-SNAPSHOT"
+(defproject acetyl "0.0.3-SNAPSHOT"
   :dependencies [[org.clojure/clojure "1.6.0"]]
   :description "JVM client for AceDB"
   :source-paths ["src/clj"]

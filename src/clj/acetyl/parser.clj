@@ -28,34 +28,63 @@
       (.substring s 1 (dec (count s)))
       (throw (Exception. (str "malformed string " s))))
     s))
-   
-(defn- parse-aceobj [[header-line & lines]]
+
+(defn- drop-timestamp [toks]
+  (if (= (first toks) "-O")
+    (drop 2 toks)
+    toks))
+
+(defn- parse-aceline [line keep-comments?]
+  (loop [[t & toks] line
+         out        []]
+    (cond
+     (nil? t)
+       out
+     (= t "-C")
+       (if keep-comments?
+         (recur toks (conj out t))
+         (recur (drop-timestamp (drop 1 toks)) out))
+     :default
+     (recur (drop-timestamp toks) (conj out (unquote-str t))))))
+
+(defn- parse-aceobj [[header-line & lines] keep-comments?]
   (if-let [[_ clazz id] (re-find header-re header-line)]
     {:class clazz 
      :id id 
      :lines (vec (for [l lines]
-              (mapv #(unquote-str (first %)) (partition 3 (re-seq line-re l)))))}
+                   (parse-aceline (re-seq line-re l) keep-comments?)))}
     (throw (Exception. (str "Bad header line: " header-line)))))
   
 
-(defn- aceobj-seq [lines]
+(defn- aceobj-seq [lines keep-comments?]
   (lazy-seq
    (let [lines       (drop-while null-line? lines)
          obj-lines   (take-while (complement null-line?) lines)
          rest-lines  (drop-while (complement null-line?) lines)]
      (when (not (empty? obj-lines))
-       (let [obj (parse-aceobj obj-lines)]
-         (if (= (:class obj) "LongText")
+       (let [obj (parse-aceobj obj-lines keep-comments?)]
+         (case (:class obj)
+           "LongText"
            (cons (assoc obj :text (.trim (str/join "\n" 
                                            (take-while (complement long-text-end?) rest-lines))))
-                 (aceobj-seq (rest (drop-while (complement long-text-end?) rest-lines))))
+                 (aceobj-seq (rest (drop-while (complement long-text-end?) rest-lines)) keep-comments?))
+
+           "DNA"
+           (cons (assoc obj
+                   :text  (str/join (map first (:lines obj)))
+                   :lines nil)
+                 (aceobj-seq rest-lines keep-comments?))
+
+           ;; default
            (cons obj
-                 (aceobj-seq rest-lines))))))))
+                 (aceobj-seq rest-lines keep-comments?))))))))
 
 (defn ace-seq
   "Return a sequence of objects from a .ace file"
-  [ace]
-  (aceobj-seq (line-seq (:reader ace))))
+  ([ace]
+     (ace-seq ace false))
+  ([ace keep-comments?]
+     (aceobj-seq (line-seq (:reader ace)) keep-comments?)))
 
 (defn- pmatch 
   "Test whether `path` is a prefix of `l`"
@@ -78,11 +107,11 @@
 (defn- fetch-ace-block [ace pos max]
   (when (< pos max)
     (lazy-cat 
-     (->> (.transactToStream ace (str "show -a -T -b " pos " -c 100"))
-          (reader)
-          (line-seq)
-          (aceobj-seq)
-          (doall))
+     (as-> (.transactToStream ace (str "show -a -T -b " pos " -c 100")) $
+           (reader $)
+           (line-seq $)
+           (aceobj-seq $ false)
+           (doall $))
      (fetch-ace-block ace (+ pos 100) max))))
 
 (defn query-ace [server port ace-class]
