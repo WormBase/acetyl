@@ -7,6 +7,16 @@
   (close [_]
     (.close reader)))
 
+(defn- ace-line-seq
+  "Like line-seq but collapses down any continuation lines in the ace stream"
+  [^java.io.BufferedReader rdr]
+  (when-let [line (loop [line (.readLine rdr)]
+                    (when line
+                      (if (.endsWith line "\\")
+                        (recur (str (.substring line 0 (dec (count line))) (.readLine rdr)))
+                        line)))]
+    (cons line (lazy-seq (ace-line-seq rdr)))))
+
 (defn ace-reader
   "Open a .ace file for reading"
   [ace]
@@ -19,8 +29,8 @@
 (defn- long-text-end? [l]
   (= l "***LongTextEnd***"))
 
-(def ^:private header-re #"^(\w+) : \"([^\"]+)\"")
-(def ^:private line-re #"[A-Za-z_0-9:.-]+|\".*?[^\\]\"")
+(def ^:private header-re #"(?m)^(\w+) : \"([^\"]+)\"")
+(def ^:private line-re #"(?m)[A-Za-z_0-9:.-]+|\".*?[^\\]\"")
 
 (defn- unquote-str [^String s]
   (if (.startsWith s "\"")
@@ -104,7 +114,7 @@
   ([ace]
      (ace-seq ace false))
   ([ace keep-comments?]
-     (aceobj-seq (line-seq (:reader ace)) keep-comments?)))
+     (aceobj-seq (ace-line-seq (:reader ace)) keep-comments?)))
 
 (defn- pmatch 
   "Test whether `path` is a prefix of `l`"
@@ -129,7 +139,7 @@
     (lazy-cat 
      (as-> (.transactToStream ace (str "show -a -T -b " pos " -c 100")) $
            (reader $)
-           (line-seq $)
+           (ace-line-seq $)
            (aceobj-seq $ false)
            (doall $))
      (fetch-ace-block ace (+ pos 100) max))))
@@ -146,3 +156,5 @@
   (let [ace (acetyl.AceSocket. server port)
         msg (.transact ace (str "find " ace-class " " name))]
     (first (fetch-ace-block ace 0 1))))
+
+
