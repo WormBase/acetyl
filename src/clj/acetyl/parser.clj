@@ -59,25 +59,45 @@
 (defn- aceobj-seq [lines keep-comments?]
   (lazy-seq
    (let [lines       (drop-while null-line? lines)
-         obj-lines   (take-while (complement null-line?) lines)
-         rest-lines  (drop-while (complement null-line?) lines)]
-     (when (not (empty? obj-lines))
-       (let [obj (parse-aceobj obj-lines keep-comments?)]
-         (case (:class obj)
-           "LongText"
-           (cons (assoc obj :text (.trim (str/join "\n" 
-                                           (take-while (complement long-text-end?) rest-lines))))
-                 (aceobj-seq (rest (drop-while (complement long-text-end?) rest-lines)) keep-comments?))
+         header-line (first lines)
+         [_ clazz id] (re-find header-re (or header-line ""))]
+     (cond
+      (empty? header-line)
+        nil
+      
+      (= clazz "LongText")
+       (cons
+        {:class "LongText"
+         :id id
+         :text (->> (rest lines)
+                    (take-while (complement long-text-end?))
+                    (str/join "\n")
+                    (.trim))}
+        (aceobj-seq (->> (drop-while (complement long-text-end?) lines)
+                         (rest))
+                    keep-comments?))
 
-           "DNA"
-           (cons (assoc obj
-                   :text  (str/join (map first (:lines obj)))
-                   :lines nil)
+      :default
+       (let [obj-lines   (take-while (complement null-line?) lines)
+             rest-lines  (drop-while (complement null-line?) lines)]
+         (when (not (empty? obj-lines))
+           (let [obj (parse-aceobj obj-lines keep-comments?)]
+             (case (:class obj)
+               "DNA"
+               (cons (assoc obj
+                       :text  (str/join (map first (:lines obj)))
+                       :lines nil)
+                     (aceobj-seq rest-lines keep-comments?))
+           
+               "Peptide"
+               (cons (assoc obj
+                       :text  (str/join (map first (:lines obj)))
+                       :lines nil)
                  (aceobj-seq rest-lines keep-comments?))
 
-           ;; default
-           (cons obj
-                 (aceobj-seq rest-lines keep-comments?))))))))
+               ;; default
+               (cons obj
+                     (aceobj-seq rest-lines keep-comments?))))))))))
 
 (defn ace-seq
   "Return a sequence of objects from a .ace file"
