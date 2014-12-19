@@ -30,7 +30,7 @@
   (= l "***LongTextEnd***"))
 
 (def ^:private header-re #"(?m)^(\w+) : \"([^\"]+)\"")
-(def ^:private line-re #"(?m)[A-Za-z_0-9:.-]+|\".*?[^\\]\"")
+(def ^:private line-re #"(?m)[A-Za-z_0-9:.-]+|\"\"|\".*?[^\\]\"")
 
 (defn- unquote-str [^String s]
   (if (.startsWith s "\"")
