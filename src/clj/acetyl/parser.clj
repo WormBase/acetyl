@@ -44,18 +44,25 @@
     (drop 2 toks)
     toks))
 
+(defn- take-timestamp [toks]
+  (if (= (first toks) "-O")
+    (unquote-str (second toks))))
+
 (defn- parse-aceline [line keep-comments?]
   (loop [[t & toks] line
-         out        []]
+         out        []
+         ts         []]
     (cond
      (nil? t)
-       out
+       (if (some identity ts)
+         (with-meta out {:timestamps ts})
+         out)
      (= t "-C")
        (if keep-comments?
-         (recur toks (conj out t))
-         (recur (drop-timestamp (drop 1 toks)) out))
+         (recur toks (conj out t) (conj ts nil))    ;; The -C node doesn't have a timestamp
+         (recur (drop-timestamp (drop 1 toks)) out ts))
      :default
-     (recur (drop-timestamp toks) (conj out (unquote-str t))))))
+     (recur (drop-timestamp toks) (conj out (unquote-str t)) (conj ts (take-timestamp toks))))))
 
 (defn- parse-aceobj [[header-line & lines] keep-comments?]
   (if-let [[_ clazz id] (re-find header-re header-line)]
