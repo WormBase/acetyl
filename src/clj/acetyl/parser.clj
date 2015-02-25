@@ -29,8 +29,8 @@
 (defn- long-text-end? [l]
   (= l "***LongTextEnd***"))
 
-(def ^:private header-re #"(?m)^(\w+) : \"([^\"]+)\"")
-(def ^:private line-re #"(?m)[A-Za-z_0-9:.-]+|\"\"|\".*?[^\\]\"")
+(def ^:private header-re #"(?m)^(\w+) : \"([^\"]+)\"(?: -O (.*))?")
+(def ^:private line-re #"(?m)[A-Za-z_0-9:.-]+|\"\"|\"(?:[^\\\"]*|\\.)*\"")
 
 (defn- unquote-str [^String s]
   (if (.startsWith s "\"")
@@ -65,9 +65,11 @@
      (recur (drop-timestamp toks) (conj out (unquote-str t)) (conj ts (take-timestamp toks))))))
 
 (defn- parse-aceobj [[header-line & lines] keep-comments?]
-  (if-let [[_ clazz id] (re-find header-re header-line)]
+  (if-let [[_ clazz id obj-stamp] (re-find header-re header-line)]
     {:class clazz 
-     :id id 
+     :id id
+     :timestamp (if obj-stamp
+                  (unquote-str obj-stamp))
      :lines (vec (for [l lines]
                    (parse-aceline (re-seq line-re l) keep-comments?)))}
     (throw (Exception. (str "Bad header line: " header-line)))))
@@ -77,7 +79,7 @@
   (lazy-seq
    (let [lines       (drop-while null-line? lines)
          header-line (first lines)
-         [_ clazz id] (re-find header-re (or header-line ""))]
+         [_ clazz id obj-stamp] (re-find header-re (or header-line ""))]
      (cond
       (empty? header-line)
         nil
@@ -86,6 +88,8 @@
        (cons
         {:class "LongText"
          :id id
+         :timestamp (if obj-stamp
+                      (unquote-str obj-stamp))
          :text (->> (rest lines)
                     (take-while (complement long-text-end?))
                     (str/join "\n")
