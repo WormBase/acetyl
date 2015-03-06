@@ -30,6 +30,8 @@
   (= l "***LongTextEnd***"))
 
 (def ^:private header-re #"(?m)^(\w+) : \"([^\"]+)\"(?: -O (.*))?")
+(def delete-re #"(?m)^-D\s+(\w+)\s+(\"\"|\"(?:[^\\\"]*|\\.)*\"|\w+)$")
+(def rename-re #"(?m)^-R\s+(\w+)\s+(\"\"|\"(?:[^\\\"]*|\\.)*\"|\w+)\s(\"\"|\"(?:[^\\\"]*|\\.)*\"|\w+)$")
 (def ^:private line-re #"(?m)[A-Za-z_0-9:.-]+|\"\"|\"(?:[^\\\"]*|\\.)*\"")
 
 (defn- unquote-str [^String s]
@@ -65,14 +67,22 @@
      (recur (drop-timestamp toks) (conj out (unquote-str t)) (conj ts (take-timestamp toks))))))
 
 (defn- parse-aceobj [[header-line & lines] keep-comments?]
-  (if-let [[_ clazz id obj-stamp] (re-find header-re header-line)]
-    {:class clazz 
-     :id id
-     :timestamp (if obj-stamp
-                  (unquote-str obj-stamp))
-     :lines (vec (for [l lines]
-                   (parse-aceline (re-seq line-re l) keep-comments?)))}
-    (throw (Exception. (str "Bad header line: " header-line)))))
+  (if-let [[_ clazz id] (re-find delete-re header-line)]
+    {:class clazz
+     :id (unquote-str id)
+     :delete true}
+    (if-let [[_ clazz id1 id2] (re-find rename-re header-line)]
+      {:class clazz
+       :id (unquote-str id1)
+       :rename (unquote-str id2)}
+      (if-let [[_ clazz id obj-stamp] (re-find header-re header-line)]
+        {:class clazz 
+         :id id
+         :timestamp (if obj-stamp
+                      (unquote-str obj-stamp))
+         :lines (vec (for [l lines]
+                       (parse-aceline (re-seq line-re l) keep-comments?)))}
+        (throw (Exception. (str "Bad header line: " header-line)))))))
   
 
 (defn- aceobj-seq [lines keep-comments?]
