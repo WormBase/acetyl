@@ -29,7 +29,7 @@
 (defn- long-text-end? [l]
   (= l "***LongTextEnd***"))
 
-(def ^:private header-re #"(?m)^(\w+) : \"([^\"]+)\"(?: -O (.*))?")
+(def ^:private header-re #"(?m)^(\w+) *: *(?:\"([^\"]+)\"|(\w+))(?: -O (.*))?")
 (def delete-re #"(?m)^-D\s+(\w+)\s+(\"\"|\"(?:[^\\\"]*|\\.)*\"|\w+)$")
 (def rename-re #"(?m)^-R\s+(\w+)\s+(\"\"|\"(?:[^\\\"]*|\\.)*\"|\w+)\s(\"\"|\"(?:[^\\\"]*|\\.)*\"|\w+)$")
 (def ^:private line-re #"(?m)[A-Za-z_0-9:.-]+|\"\"|\"(?:[^\\\"]*|\\.)*\"")
@@ -75,9 +75,9 @@
       {:class clazz
        :id (unquote-str id1)
        :rename (unquote-str id2)}
-      (if-let [[_ clazz id obj-stamp] (re-find header-re header-line)]
+      (if-let [[_ clazz idq idb obj-stamp] (re-find header-re header-line)]
         {:class clazz 
-         :id id
+         :id (or idq idb)
          :timestamp (if obj-stamp
                       (unquote-str obj-stamp))
          :lines (vec (for [l lines]
@@ -89,7 +89,7 @@
   (lazy-seq
    (let [lines       (drop-while null-line? lines)
          header-line (first lines)
-         [_ clazz id obj-stamp] (re-find header-re (or header-line ""))]
+         [_ clazz idq idb obj-stamp] (re-find header-re (or header-line ""))]
      (cond
       (empty? header-line)
         nil
@@ -97,7 +97,7 @@
       (= clazz "LongText")
        (cons
         {:class "LongText"
-         :id id
+         :id (or idq idb)
          :timestamp (if obj-stamp
                       (unquote-str obj-stamp))
          :text (->> (rest lines)
