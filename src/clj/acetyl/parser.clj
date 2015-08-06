@@ -23,8 +23,9 @@
     (AceReader. (reader ace)))
 
 (defn- null-line? [^String l]
-  (or (empty? l)
-      (.startsWith (.trim l) "//")))
+  (let [l (.trim l)]
+    (or (empty? l)
+        (.startsWith l "//"))))
 
 (defn- long-text-end? [l]
   (= l "***LongTextEnd***"))
