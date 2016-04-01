@@ -27,10 +27,10 @@
   (AceReader. (reader ace)))
 
 (defn- null-line?
-  [^String l]
-  (let [l (.trim l)]
-    (or (empty? l)
-        (.startsWith l "//"))))
+  [^String line]
+  (let [line (.trim line)]
+    (or (empty? line)
+        (.startsWith line "//"))))
 
 (defn- long-text-end?
   [l]
@@ -95,8 +95,10 @@
          :id (or idq idb)
          :timestamp (if obj-stamp
                       (unquote-str obj-stamp))
-         :lines (vec (for [l lines]
-                       (parse-aceline (re-seq line-re l) keep-comments?)))}
+         :lines (vec (for [line lines]
+                       (parse-aceline
+                        (re-seq line-re line)
+                        keep-comments?)))}
         (throw (Exception. (str "Bad header line: " header-line)))))))
 
 
@@ -155,17 +157,17 @@
      (aceobj-seq (ace-line-seq (:reader ace)) keep-comments?)))
 
 (defn- pmatch
-  "Test whether `path` is a prefix of `l`."
-  [path l]
-  (and (< (count path) (count l))
-       (= path (take (count path) l))))
+  "Test whether `path` is a prefix of `line`."
+  [path line]
+  (and (< (count path) (count line))
+       (= path (take (count path) line))))
 
 (defn select
   "Return any lines in acedb object `obj` with leading tags matching `path`."
   [obj path]
-  (for [l (:lines obj)
-        :when (pmatch path l)]
-    (nthrest l (count path))))
+  (for [line (:lines obj)
+        :when (pmatch path line)]
+    (nthrest line (count path))))
 
 (defn unescape
   "Unescape double back-slash escaped characters in a string."
