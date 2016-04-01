@@ -160,14 +160,14 @@
 (defn- pmatch
   "Test whether `path` is a prefix of `line`."
   [path line]
-  (and (< (count path) (count line))
-       (= path (take (count path) line))))
+  (let [path-len (count path)]
+    (and (< path-len (count line))
+         (= path (take path-len line)))))
 
 (defn select
   "Return any lines in acedb object `obj` with leading tags matching `path`."
   [obj path]
-  (for [line (:lines obj)
-        :when (pmatch path line)]
+  (for [line (:lines obj) :when (pmatch path line)]
     (nthrest line (count path))))
 
 (defn unescape
