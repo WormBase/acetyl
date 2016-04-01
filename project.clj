@@ -1,8 +1,7 @@
-(defproject acetyl "0.0.9-SNAPSHOT"
-  :dependencies [[org.clojure/clojure "1.6.0"]]
-  :description "JVM client for AceDB"
-  :source-paths ["src/clj"]
-  :java-source-paths ["src/java"]
-  :javac-options ["-target" "1.6" "-source" "1.6"]
+(defproject wormbase/acetyl "0.0.9-SNAPSHOT"
+  :dependencies [[org.clojure/clojure "1.7.0"]
+                 [clj-time "0.11.0"]]
+  :description "AceDB utility routines"
+  :javac-options ["-target" "1.8" "-source" "1.8"]
   :license "LGPL"
-  :url "http://www.biodalliance.org/people/thomas")
+  :url "http://github.com/Wormbase/acetyl")
