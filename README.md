@@ -5,7 +5,7 @@ Clojure code for working with
 
  * acetyl.parser
  
-Original developed by @dasmoth.
+Originally developed by [Thomas Down](https://github.com/dasmoth).
 
 Developed for use by the [WormBase](https://www.wormbase.org/) project.
 
